@@ -1,0 +1,12 @@
+venv/
+.venv/
+.env
+instance/
+__pycache__/
+*.pyc
+.pytest_cache/
+.playwright-mcp/
+prototype/screenshots/
+.DS_Store
+backups/
+.vscode/

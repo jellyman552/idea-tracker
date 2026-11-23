@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Reviews · Idea Tracker{% endblock %}
+{% block content %}
+{% set p = data.period %}
+{% set kind = p.type %}
+{% set weekly_keys = ['projects_touched', 'notes_added', 'milestones_completed', 'status_changes', 'commits'] %}
+
+<div class="review-head">
+  <h2>Reviews</h2>
+  <div role="group" class="review-tabs">
+    {% for k in kinds %}
+    <a role="button" href="{{ url_for('reviews.show', kind=k) }}" class="{{ '' if k == kind else 'outline' }}">{{ k|capitalize }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<nav class="period-nav" aria-label="Choose period">
+  <a role="button" class="outline secondary btn-sm" href="{{ url_for('reviews.show', kind=kind, offset=p.offset - 1) }}" title="Previous">←</a>
+  <strong>{{ p.label }}</strong>{% if p.is_current %}<small class="meta">this {{ {'weekly': 'week', 'monthly': 'month', 'yearly': 'year'}[kind] }}</small>{% endif %}
+  {% if p.offset < 0 %}
+  <a role="button" class="outline secondary btn-sm" href="{{ url_for('reviews.show', kind=kind, offset=(p.offset + 1) or None) }}" title="Next">→</a>
+  {% else %}<span class="btn-sm placeholder" aria-hidden="true"></span>{% endif %}
+</nav>
+
+<div class="stat-grid">
+  {% for key, label in totals.items() if kind != 'weekly' or key in weekly_keys %}
+  {% set n = data.totals[key] %}{% set diff = n - data.previous_totals[key] %}
+  <article class="stat">
+    <div class="stat-num">{{ n }}</div>
+    <div class="stat-label">{{ label }}</div>
+    {% if kind != 'weekly' %}
+    <div class="delta {{ 'up' if diff > 0 else 'down' if diff < 0 else '' }}"
+         title="vs previous {{ 'month' if kind == 'monthly' else 'year' }}">
+      {% if diff > 0 %}▲ {{ diff }}{% elif diff < 0 %}▼ {{ -diff }}{% else %}–{% endif %}</div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+
+{% if kind == 'yearly' %}
+<div class="stat-grid">
+  <article class="stat">
+    <div class="stat-num small">{{ data.most_active_month.month if data.most_active_month else '—' }}</div>
+    <div class="stat-label">Most active month{% if data.most_active_month %} ({{ data.most_active_month.events }} events){% endif %}</div>
+  </article>
+  <article class="stat">
+    <div class="stat-num small">{{ data.longest_running_active.title if data.longest_running_active else '—' }}</div>
+    <div class="stat-label">Longest-running active{% if data.longest_running_active %} ({{ data.longest_running_active.days }} days){% endif %}</div>
+  </article>
+  <article class="stat">
+    <div class="stat-num">{{ data.avg_days_idea_to_active if data.avg_days_idea_to_active is not none else '—' }}</div>
+    <div class="stat-label">Avg days idea → active</div>
+  </article>
+  <article class="stat">
+    <div class="stat-num">{{ data.avg_days_active_to_done if data.avg_days_active_to_done is not none else '—' }}</div>
+    <div class="stat-label">Avg days active → done</div>
+  </article>
+</div>
+
+<h3>Activity</h3>
+<div class="overflow-auto">
+  <div class="heatmap" role="img" aria-label="Daily activity for {{ p.label }}">
+    {% for day in data.heatmap %}
+    {% set level = 0 if not day.events else ((day.events * 4 / data.heatmap_max)|round(0, 'ceil'))|int %}
+    <span class="cell l{{ level }}{{ ' out' if not day.in_year }}" title="{{ day.date }}: {{ day.events }} event{{ '' if day.events == 1 else 's' }}"></span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="review-cols">
+  <section>
+    <h3>Projects touched</h3>
+    {% if data.touched %}
+    {% set top = data.touched[0].events %}
+    <ul class="bars">
+      {% for t in data.touched %}
+      <li>
+        <span><a href="{{ url_for('projects.detail', project_id=t.id) }}">{{ t.title }}</a>{% if loop.first %} <span class="badge s-active">most active</span>{% endif %}</span>
+        <div class="bar"><span style="width: {{ (t.events * 100 / top)|round|int }}%"></span></div>
+        <small>{{ t.events }} event{{ '' if t.events == 1 else 's' }}</small>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="meta">Nothing touched this period.</p>{% endif %}
+
+    {% if data.commits_by_project %}
+    <h3>Commits</h3>
+    <ul class="plain">{% for c in data.commits_by_project %}<li>{{ c.commits }} commit{{ '' if c.commits == 1 else 's' }} to {{ c.title }}</li>{% endfor %}</ul>
+    {% endif %}
+
+    {% if kind != 'weekly' and data.by_type %}
+    <h3>By type</h3>
+    {% set top = data.by_type|map(attribute='events')|max %}
+    <ul class="bars">
+      {% for t in data.by_type %}
+      <li><span><span class="badge t-{{ t.type }}">{{ t.type }}</span></span>
+        <div class="bar"><span style="width: {{ (t.events * 100 / top)|round|int }}%"></span></div>
+        <small>{{ t.events }}</small></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  <section>
+    <h3>Milestones completed</h3>
+    {% if data.milestones_completed %}
+    <ul class="plain">{% for m in data.milestones_completed %}<li>✓ {{ m.title }} <small class="meta">· {{ m.project }}</small></li>{% endfor %}</ul>
+    {% else %}<p class="meta">None.</p>{% endif %}
+
+    <h3>Status changes</h3>
+    {% if data.status_changes %}
+    <ul class="plain">
+      {% for c in data.status_changes %}
+      <li>{{ c.project }}: <span class="badge s-{{ c.from }}">{{ c.from }}</span> → <span class="badge s-{{ c.to }}">{{ c.to }}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="meta">None.</p>{% endif %}
+
+    {% if kind != 'weekly' %}
+    <h3>Ideas that became active</h3>
+    {% if data.ideas_activated %}<ul class="plain">{% for t in data.ideas_activated %}<li>{{ t }}</li>{% endfor %}</ul>{% else %}<p class="meta">None.</p>{% endif %}
+    <h3>Completed</h3>
+    {% if data.projects_completed %}<ul class="plain">{% for t in data.projects_completed %}<li>🎉 {{ t }}</li>{% endfor %}</ul>{% else %}<p class="meta">None.</p>{% endif %}
+    {% endif %}
+
+    {% if p.is_current %}
+    <h3>Stale right now</h3>
+    {% if data.stale %}
+    <ul class="plain">{% for s in data.stale %}<li><a href="{{ url_for('projects.detail', project_id=s.id) }}">{{ s.title }}</a> <span class="badge b-stale">{{ s.days }}d</span></li>{% endfor %}</ul>
+    {% else %}<p class="meta">Nothing stale.</p>{% endif %}
+    {% endif %}
+  </section>
+</div>
+
+<h3>Reflection</h3>
+<form method="post" action="{{ url_for('reviews.save', kind=kind, offset=p.offset or None) }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  {% for prompt in data.reflection.prompts %}
+  <label>{{ prompt }}
+    <textarea name="answer-{{ loop.index0 }}" rows="2">{{ data.reflection.answers.get(prompt, '') }}</textarea>
+  </label>
+  {% endfor %}
+  <button type="submit">Save reflection</button>
+</form>
+{% endblock %}

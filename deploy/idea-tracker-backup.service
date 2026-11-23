@@ -1,0 +1,11 @@
+[Unit]
+Description=Idea Tracker nightly SQLite backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Change these to your user and the folder you cloned the repo into.
+User=YOUR_USER
+WorkingDirectory=/home/YOUR_USER/idea-tracker
+ExecStart=/home/YOUR_USER/idea-tracker/deploy/backup.sh

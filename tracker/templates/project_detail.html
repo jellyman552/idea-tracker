@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, type_badge, progress_bar, archive_form, restore_form, audit_table %}
+{% block title %}{{ project.title }} · Idea Tracker{% endblock %}
+{% block content %}
+{% set ro = project.archived_at is not none %}
+<p class="meta"><a href="{{ url_for('projects.archive') if ro else url_for('projects.dashboard') }}">← {{ 'Archive' if ro else 'Dashboard' }}</a></p>
+{% if ro %}<div class="readonly-banner detail-head">
+  <span>📦 Archived {{ project.archived_at|datetime }}. This project is read-only.</span>
+  {{ restore_form(url_for('projects.unarchive_project', project_id=project.id)) }}
+</div>{% endif %}
+
+{% if stale.stale %}
+<div class="readonly-banner stale-banner detail-head">
+  <span>💤 Quiet for {{ stale.days }} days (last activity {{ stale.last_activity|date }}). Still on the list?</span>
+  <form method="post" action="{{ url_for('projects.snooze_project', project_id=project.id) }}" class="inline">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="outline btn-sm" title="Reset the stale clock without adding a note">Keep it</button>
+  </form>
+</div>
+{% endif %}
+<div class="detail-head">
+  <div>
+    <h2>{{ project.title }}</h2>
+    <div class="badges">{{ type_badge(project.type) }}{{ status_badge(project.status) }}{% if ro %}<span class="badge b-archived">archived</span>{% endif %}</div>
+    {{ progress_bar(project, 'lg') }}
+    <p class="meta" style="margin-top:.5rem">Created {{ project.created_at|date }} · Updated {{ project.updated_at|datetime }}</p>
+  </div>
+  {% if not ro %}
+  <div class="actions">
+    <a href="{{ url_for('projects.edit_project', project_id=project.id) }}" role="button" class="outline btn-sm">Edit</a>
+    {{ archive_form(url_for('projects.archive_project', project_id=project.id),
+                    {'kind': 'project', 'name': project.title, 'effect': 'and its notes and milestones will move to the Archive as read-only.'}) }}
+  </div>
+  {% endif %}
+</div>
+
+<article>
+  <p style="white-space:pre-wrap">{% if project.summary %}{{ project.summary }}{% else %}<span class="meta">No summary yet.</span>{% endif %}</p>
+  <p style="margin:0"><strong>Chat:</strong>
+    {% if project.chat_link %}<a href="{{ project.chat_link }}" target="_blank" rel="noopener">{{ project.chat_link }}</a>
+    {% else %}<span class="meta">Not linked</span>{% endif %}</p>
+  {% if project.repo_url %}
+  <p style="margin:.4rem 0 0"><strong>GitHub:</strong>
+    <a href="{{ project.repo_url }}" target="_blank" rel="noopener">{{ project.repo_url.replace('https://github.com/', '') }}</a></p>
+  {% endif %}
+</article>
+
+<h3>Milestones</h3>
+<ul class="milestones">
+  {% for m in project.active_milestones %}
+  <li>
+    {% if ro %}
+      <label><input type="checkbox" disabled {{ 'checked' if m.done }}><span class="{{ 'done-text' if m.done }}">{{ m.title }}</span></label>
+    {% else %}
+      <form method="post" action="{{ url_for('projects.toggle_milestone', milestone_id=m.id) }}" class="inline">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <input type="hidden" name="done" value="{{ '0' if m.done else '1' }}">
+        <label><input type="checkbox" {{ 'checked' if m.done }} data-autosubmit aria-label="Mark {{ m.title }} {{ 'not done' if m.done else 'done' }}">
+          <span class="{{ 'done-text' if m.done }}">{{ m.title }}</span></label>
+        <noscript><button type="submit" class="link">Save</button></noscript>
+      </form>
+      {{ archive_form(url_for('projects.archive_milestone', milestone_id=m.id),
+                      {'kind': 'milestone', 'name': m.title, 'effect': 'will be removed from the checklist and progress.'}, as_link=true) }}
+    {% endif %}
+  </li>
+  {% else %}
+  <li><span class="meta">No milestones yet. Your AI assistant can add these via MCP.</span></li>
+  {% endfor %}
+</ul>
+{% if not ro %}
+<form method="post" action="{{ url_for('projects.add_milestone', project_id=project.id) }}" class="ms-form">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <input name="title" placeholder="Add a milestone" required maxlength="200" aria-label="Milestone">
+  <button type="submit" class="outline">Add</button>
+</form><br>
+{% endif %}
+
+<h3>Progress notes</h3>
+{% if not ro %}
+<form method="post" action="{{ url_for('projects.add_note', project_id=project.id) }}" class="note-form">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <input type="date" name="date" value="{{ today() }}" required aria-label="Date">
+  <textarea name="note" rows="1" placeholder="What happened? (e.g. Shipped the first version)" required aria-label="Note"></textarea>
+  <button type="submit">Add note</button>
+</form><br>
+{% endif %}
+<ul class="timeline">
+  {% for n in project.active_logs %}
+  <li>
+    {% if editing_note == n.id and not ro %}
+    <form method="post" action="{{ url_for('projects.update_note', note_id=n.id) }}" class="note-form">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="date" name="date" value="{{ n.date.isoformat() }}" required>
+      <textarea name="note" rows="2" required>{{ n.note }}</textarea>
+      <div class="actions">
+        <button type="submit" class="btn-sm">Save</button>
+        <a href="{{ url_for('projects.detail', project_id=project.id) }}" role="button" class="secondary btn-sm">Cancel</a>
+      </div>
+    </form>
+    {% else %}
+    <div class="note-row">
+      <div><div class="note-date">{{ n.date|date }}{% if note_sources.get(n.id) == 'mcp' %} <span class="badge b-claude" title="Written by an AI assistant via MCP">AI</span>{% endif %}</div><div style="white-space:pre-wrap">{{ n.note }}</div></div>
+      {% if not ro %}
+      <div class="note-actions">
+        <a href="{{ url_for('projects.detail', project_id=project.id, edit_note=n.id) }}">Edit</a>
+        {{ archive_form(url_for('projects.archive_note', note_id=n.id),
+                        {'kind': 'note', 'name': n.note|truncate(60), 'effect': 'will be hidden from the timeline and kept read-only.'}, as_link=true) }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </li>
+  {% else %}
+  <li><span class="meta">No notes yet.</span></li>
+  {% endfor %}
+</ul>
+
+{% if project.repo_url %}
+<h3>Recent commits</h3>
+{% set commits = project.commits.limit(5).all() %}
+{% if commits %}
+<ul class="plain commits">
+  {% for c in commits %}
+  <li><a href="{{ c.url }}" target="_blank" rel="noopener"><code>{{ c.sha[:7] }}</code></a> {{ c.headline }}
+    <small class="meta">· {{ c.committed_at|date }}</small></li>
+  {% endfor %}
+</ul>
+{% else %}<p class="meta">No commits synced yet. The server syncs every few hours.</p>{% endif %}
+{% endif %}
+
+{% set archived_notes = project.archived_logs %}
+{% if archived_notes %}
+<details>
+  <summary>Archived notes ({{ archived_notes|length }})</summary>
+  <ul class="timeline">
+    {% for n in archived_notes %}
+    <li class="archived">
+      <div class="note-row">
+        <div><div class="note-date">{{ n.date|date }} · archived {{ n.archived_at|date }}</div><div>{{ n.note }}</div></div>
+        {% if not ro %}<div class="note-actions">{{ restore_form(url_for('projects.unarchive_note', note_id=n.id), as_link=true) }}</div>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+
+{% set archived_milestones = project.milestones|selectattr('archived_at')|list %}
+{% if archived_milestones %}
+<details>
+  <summary>Archived milestones ({{ archived_milestones|length }})</summary>
+  <ul class="milestones">
+    {% for m in archived_milestones %}
+    <li>
+      <span class="meta">{{ '✓ ' if m.done }}{{ m.title }} · archived {{ m.archived_at|date }}</span>
+      {% if not ro %}{{ restore_form(url_for('projects.unarchive_milestone', milestone_id=m.id), as_link=true) }}{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+
+<details>
+  <summary>History ({{ history|length }})</summary>
+  {{ audit_table(history) }}
+</details>
+{% endblock %}

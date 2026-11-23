@@ -1,0 +1,16 @@
+venv/
+.venv/
+.env
+instance/
+backups/
+.git/
+.pytest_cache/
+.playwright-mcp/
+__pycache__/
+docs/
+.github/
+prototype/
+tests/
+deploy/
+README.md
+LICENSE

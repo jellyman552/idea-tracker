@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_macros.html" import audit_table %}
+{% block title %}Audit log · Idea Tracker{% endblock %}
+{% block content %}
+<h2>Audit log</h2>
+<p class="meta">Every create, edit and archive. Source shows where the change came from (web, cli, or mcp).</p>
+{{ audit_table(rows.items, show_project=true) }}
+{% if rows.pages > 1 %}
+<nav class="pagination">
+  {% if rows.has_prev %}<a href="{{ url_for('projects.audit', page=rows.prev_num) }}">← Newer</a>{% endif %}
+  <span class="meta">Page {{ rows.page }} of {{ rows.pages }}</span>
+  {% if rows.has_next %}<a href="{{ url_for('projects.audit', page=rows.next_num) }}">Older →</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if project else 'New' }} project · Idea Tracker{% endblock %}
+{% block content %}
+{% set back = url_for('projects.detail', project_id=project.id) if project else url_for('projects.dashboard') %}
+<p class="meta"><a href="{{ back }}">← Cancel</a></p>
+<h2>{{ 'Edit project' if project else 'New project' }}</h2>
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <label>Title <input name="title" value="{{ values.title }}" required maxlength="200"></label>
+  <div class="grid">
+    <label>Type
+      <select name="type">{% for t in PROJECT_TYPES %}<option {{ 'selected' if values.type == t }}>{{ t }}</option>{% endfor %}</select>
+    </label>
+    <label>Status
+      <select name="status">{% for s in STATUSES %}<option {{ 'selected' if values.status == s }}>{{ s }}</option>{% endfor %}</select>
+    </label>
+  </div>
+  <label>Summary <textarea name="summary" rows="4">{{ values.summary }}</textarea></label>
+  <label>Chat link
+    <input name="chat_link" type="url" value="{{ values.chat_link }}" placeholder="https://claude.ai/chat/… or https://chatgpt.com/c/…" maxlength="500">
+    <small>Filled in automatically when your AI assistant creates the project via MCP.</small>
+  </label>
+  <label>GitHub repo
+    <input name="repo_url" type="url" value="{{ values.repo_url or '' }}" placeholder="https://github.com/owner/repo" maxlength="300">
+    <small>Optional. Recent commits show on the project page and count as activity.</small>
+  </label>
+  <button type="submit">{{ 'Save changes' if project else 'Create project' }}</button>
+</form>
+{% endblock %}

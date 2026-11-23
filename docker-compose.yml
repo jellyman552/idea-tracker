@@ -1,0 +1,32 @@
+# Self-hosting: `cp .env.example .env`, fill it in, then `docker compose up -d`.
+# Caddy gets an HTTPS certificate for DOMAIN automatically (ports 80 and 443
+# must reach this machine, and DOMAIN must point at it).
+services:
+  app:
+    image: ghcr.io/jellyman552/idea-tracker:latest
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      BEHIND_PROXY: "1"
+    volumes:
+      - data:/app/instance
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:

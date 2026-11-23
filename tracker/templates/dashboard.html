@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, type_badge, progress_bar, stale_badge %}
+{% block content %}
+<form method="get" class="toolbar{{ ' no-dir' if state.view == 'table' }}" id="toolbar" data-live>
+  <input type="hidden" name="view" value="{{ state.view }}">
+  <input type="hidden" name="dir" value="{{ state.dir }}">
+  <input type="search" name="q" value="{{ state.q }}" placeholder="Search projects and notes" aria-label="Search">
+  <select name="type" aria-label="Type" data-autosubmit>
+    <option value="">All types</option>
+    {% for t in PROJECT_TYPES %}<option {{ 'selected' if state.type == t }}>{{ t }}</option>{% endfor %}
+  </select>
+  <select name="status" aria-label="Status" data-autosubmit>
+    <option value="">All statuses</option>
+    {% for s in STATUSES %}<option {{ 'selected' if state.status == s }}>{{ s }}</option>{% endfor %}
+    <option value="stale" {{ 'selected' if state.status == 'stale' }}>Stale only</option>
+  </select>
+  <select name="sort" aria-label="Sort by" title="Sort by" data-autosubmit data-reset-dir>
+    {% for key, label in sorts.items() %}<option value="{{ key }}" {{ 'selected' if state.sort == key }}>{{ label }}</option>{% endfor %}
+    {% if state.sort not in sorts %}<option value="{{ state.sort }}" selected>Latest note</option>{% endif %}
+  </select>
+  {% if state.view == 'cards' %}{# the table sorts by clicking column headers #}
+  <a role="button" class="outline secondary" title="Toggle sort direction"
+     href="{{ url_for('projects.dashboard', **dict(state, dir='asc' if state.dir == 'desc' else 'desc')) }}">
+    {{ '↑ Asc' if state.dir == 'asc' else '↓ Desc' }}</a>
+  {% endif %}
+  <div role="group">
+    <a role="button" href="{{ url_for('projects.dashboard', **dict(state, view='cards')) }}" class="{{ '' if state.view == 'cards' else 'outline' }}">Cards</a>
+    <a role="button" href="{{ url_for('projects.dashboard', **dict(state, view='table')) }}" class="{{ '' if state.view == 'table' else 'outline' }}">Table</a>
+  </div>
+</form>
+
+<div id="results">
+{% if state.view == 'cards' %}
+<div class="board" {% if columns|length == 1 %}style="grid-template-columns: minmax(0, 420px)"{% endif %}>
+  {% for s in columns %}
+  {% set items = projects|selectattr('status', 'equalto', s)|list %}
+  <section>
+    <div class="col-head s-{{ s }}"><h3>{{ s|capitalize }}</h3><span class="count">{{ items|length }}</span></div>
+    <div class="col">
+      {% for p in items %}
+      {% set n = p.latest_note %}
+      <article class="card" data-href="{{ url_for('projects.detail', project_id=p.id) }}">
+        <div class="badges">{{ type_badge(p.type) }}{{ stale_badge(stale[p.id]) }}</div>
+        <h4><a href="{{ url_for('projects.detail', project_id=p.id) }}" class="contrast">{{ p.title }}</a></h4>
+        {{ progress_bar(p) }}
+        <p>{{ p.summary }}</p>
+        {% if n %}<div class="latest"><strong>{{ n.date|date }}</strong> · {{ n.note }}</div>{% endif %}
+        <footer><span title="{{ p.updated_at|datetime }}">Updated {{ p.updated_at|ago }}</span><span>{{ '💬 chat linked' if p.chat_link }}</span></footer>
+      </article>
+      {% else %}
+      <div class="empty">No projects</div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+{% else %}
+{% macro th(key, label) -%}
+  {%- set next_dir = ('asc' if state.dir == 'desc' else 'desc') if state.sort == key else default_dir.get(key, 'asc') -%}
+  <th><a class="secondary" href="{{ url_for('projects.dashboard', **dict(state, sort=key, dir=next_dir)) }}">{{ label }}{% if state.sort == key %} {{ '↑' if state.dir == 'asc' else '↓' }}{% endif %}</a></th>
+{%- endmacro %}
+<div class="overflow-auto">
+  <table class="striped">
+    <thead><tr>
+      {{ th('title', 'Title') }}{{ th('type', 'Type') }}{{ th('status', 'Status') }}{{ th('progress', 'Progress') }}
+      {{ th('latest', 'Latest note') }}{{ th('updated_at', 'Updated') }}{{ th('created_at', 'Created') }}<th>Chat</th>
+    </tr></thead>
+    <tbody>
+    {% for p in projects %}
+      {% set n = p.latest_note %}
+      <tr class="clickable" data-href="{{ url_for('projects.detail', project_id=p.id) }}">
+        <td><a href="{{ url_for('projects.detail', project_id=p.id) }}">{{ p.title }}</a> {{ stale_badge(stale[p.id]) }}</td>
+        <td>{{ type_badge(p.type) }}</td>
+        <td>{{ status_badge(p.status) }}</td>
+        <td>{{ progress_bar(p, 'sm') or '—' }}</td>
+        <td class="note-cell">{% if n %}<strong>{{ n.date|date }}</strong> · {{ n.note }}{% else %}—{% endif %}</td>
+        <td class="nowrap" title="{{ p.updated_at|datetime }}">{{ p.updated_at|ago }}</td>
+        <td class="nowrap">{{ p.created_at|date }}</td>
+        <td>{% if p.chat_link %}<a href="{{ p.chat_link }}" target="_blank" rel="noopener" title="Open chat">💬</a>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" class="empty">No projects match.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+</div>
+{% endblock %}

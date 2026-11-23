@@ -1,0 +1,71 @@
+{% macro status_badge(status) %}<span class="badge s-{{ status }}">{{ status }}</span>{% endmacro %}
+
+{% macro type_badge(type) %}<span class="badge t-{{ type }}">{{ type }}</span>{% endmacro %}
+
+{% macro stale_badge(info) -%}
+  {%- if info.stale %}<span class="badge b-stale" title="No activity since {{ info.last_activity|date }}">stale · {{ info.days }}d</span>{% endif -%}
+{%- endmacro %}
+
+{% macro progress_bar(project, size="") %}
+  {%- set pr = project.progress -%}
+  {%- if pr -%}
+  {%- set done, total, pct = pr -%}
+  <div class="pbar {{ size }}" title="{{ pct }}%">
+    <div class="pbar-track"><div class="pbar-fill" style="--pct: {{ pct }}"></div></div>
+    <span>{{ '%d of %d' % (done, total) if total else 'Done' }}</span>
+  </div>
+  {%- endif -%}
+{% endmacro %}
+
+{# A POST form that asks for confirmation (see app.js) before archiving. #}
+{% macro archive_form(action, what, cls="outline secondary btn-sm", label="Archive", as_link=false) %}
+  <form method="post" action="{{ action }}" class="inline"
+        data-confirm-title="Archive this {{ what.kind }}?"
+        data-confirm-body="“{{ what.name }}” {{ what.effect }} You can restore it later from the Archive.">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="{{ 'link secondary' if as_link else cls }}">{{ label }}</button>
+  </form>
+{% endmacro %}
+
+{# A plain POST form that restores an archived item (no confirmation needed). #}
+{% macro restore_form(action, as_link=false) %}
+  <form method="post" action="{{ action }}" class="inline">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="{{ 'link' if as_link else 'outline btn-sm' }}">Restore</button>
+  </form>
+{% endmacro %}
+
+{% macro truncate_value(v) %}{{ v|string|truncate(80, true, '…') if v is not none else '' }}{% endmacro %}
+
+{% macro audit_table(rows, show_project=false) %}
+<div class="overflow-auto">
+  <table class="striped">
+    <thead><tr><th>When</th><th>Source</th><th>Action</th>{% if show_project %}<th>Project</th>{% endif %}<th>Details</th></tr></thead>
+    <tbody>
+    {% for a in rows %}
+      <tr>
+        <td style="white-space:nowrap">{{ a.ts|datetime }}</td>
+        <td><small>{{ a.source }}{% if a.source == 'web' %} · {{ a.user }}{% endif %}</small></td>
+        <td>{{ a.action }} {{ a.entity }}</td>
+        {% if show_project %}<td><a href="{{ url_for('projects.detail', project_id=a.project_id) }}">{{ a.project.title }}</a></td>{% endif %}
+        <td>
+          {% if a.changes %}
+          <ul class="changes">
+            {% for field, pair in a.changes.items() %}{% set old, new = pair %}
+              <li><strong>{{ field }}</strong>:
+                {% if old is none %}<span class="new">{{ truncate_value(new) }}</span>
+                {% elif old == new %}{{ truncate_value(new) }}
+                {% else %}<span class="old">{{ truncate_value(old) }}</span> → <span class="new">{{ truncate_value(new) }}</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="empty">No history.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}

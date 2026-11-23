@@ -1,0 +1,11 @@
+[Unit]
+Description=Idea Tracker GitHub commit sync
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Change these to your user and the folder you cloned the repo into.
+User=YOUR_USER
+WorkingDirectory=/home/YOUR_USER/idea-tracker
+ExecStart=/usr/bin/docker compose exec -T app flask --app tracker sync-github

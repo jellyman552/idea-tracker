@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, type_badge, restore_form %}
+{% block title %}Archive · Idea Tracker{% endblock %}
+{% block content %}
+<h2>Archive</h2>
+<p class="meta">Archived items are hidden and read-only. Restore brings them back; nothing is ever deleted.</p>
+
+<h3>Projects</h3>
+<div class="overflow-auto">
+  <table class="striped">
+    <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Archived</th><th></th></tr></thead>
+    <tbody>
+    {% for p in projects %}
+      <tr class="clickable" data-href="{{ url_for('projects.detail', project_id=p.id) }}">
+        <td><a href="{{ url_for('projects.detail', project_id=p.id) }}">{{ p.title }}</a></td>
+        <td>{{ type_badge(p.type) }}</td><td>{{ status_badge(p.status) }}</td><td>{{ p.archived_at|date }}</td>
+        <td>{{ restore_form(url_for('projects.unarchive_project', project_id=p.id)) }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="empty">Nothing archived.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h3>Notes</h3>
+<div class="overflow-auto">
+  <table class="striped">
+    <thead><tr><th>Project</th><th>Note date</th><th>Note</th><th>Archived</th><th></th></tr></thead>
+    <tbody>
+    {% for n in notes %}
+      <tr>
+        <td><a href="{{ url_for('projects.detail', project_id=n.project_id) }}">{{ n.project.title }}</a></td>
+        <td>{{ n.date|date }}</td><td>{{ n.note }}</td><td>{{ n.archived_at|date }}</td>
+        <td>{{ restore_form(url_for('projects.unarchive_note', note_id=n.id)) }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="empty">No archived notes.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h3>Milestones</h3>
+<div class="overflow-auto">
+  <table class="striped">
+    <thead><tr><th>Project</th><th>Milestone</th><th>Was done</th><th>Archived</th><th></th></tr></thead>
+    <tbody>
+    {% for m in milestones %}
+      <tr>
+        <td><a href="{{ url_for('projects.detail', project_id=m.project_id) }}">{{ m.project.title }}</a></td>
+        <td>{{ m.title }}</td><td>{{ 'Yes' if m.done else 'No' }}</td><td>{{ m.archived_at|date }}</td>
+        <td>{{ restore_form(url_for('projects.unarchive_milestone', milestone_id=m.id)) }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="empty">No archived milestones.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

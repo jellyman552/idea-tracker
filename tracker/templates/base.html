@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Idea Tracker{% endblock %}</title>
+  <script>
+    // Set the theme before first paint to avoid a flash.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("theme"); } catch (e) {}
+      if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <!-- Installable on a phone's Home Screen -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <meta name="theme-color" content="#13171f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Ideas">
+</head>
+<body>
+  {% if DEMO_MODE %}
+  <div class="demo-banner" role="note">
+    Live demo with made-up data. Click around and change anything: it resets every night.
+  </div>
+  {% endif %}
+  {% if current_user.is_authenticated %}
+  <header class="container">
+    <nav>
+      <ul><li><a href="{{ url_for('projects.dashboard') }}" class="brand contrast"><strong>💡 Idea Tracker</strong></a></li></ul>
+      <ul>
+        {% set ep = request.endpoint %}
+        <li><a href="{{ url_for('projects.dashboard') }}" {% if ep == 'projects.dashboard' %}class="active"{% endif %}>Dashboard</a></li>
+        <li><a href="{{ url_for('reviews.index') }}" {% if ep and ep.startswith('reviews.') %}class="active"{% endif %}>Reviews</a></li>
+        <li><a href="{{ url_for('projects.archive') }}" {% if ep == 'projects.archive' %}class="active"{% endif %}>Archive</a></li>
+        <li><a href="{{ url_for('projects.audit') }}" {% if ep == 'projects.audit' %}class="active"{% endif %}>Audit log</a></li>
+        <li><button type="button" class="outline secondary theme-btn" id="themeBtn" title="Toggle dark/light mode">◐</button></li>
+        {% if not DEMO_MODE %}
+        <li>
+          <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button type="submit" class="link secondary">Log out</button>
+          </form>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
+  {% endif %}
+
+  <main class="container">
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ 'error' if category == 'error' else '' }}" role="status">{{ message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <dialog id="confirmDlg">
+    <article>
+      <header><strong id="confirmTitle">Are you sure?</strong></header>
+      <p id="confirmBody"></p>
+      <footer>
+        <button type="button" class="secondary" id="confirmCancel">Cancel</button>
+        <button type="button" id="confirmOk">Archive</button>
+      </footer>
+    </article>
+  </dialog>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});</script>
+</body>
+</html>
